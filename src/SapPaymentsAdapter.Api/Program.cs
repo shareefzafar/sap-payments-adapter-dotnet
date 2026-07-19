@@ -102,9 +102,9 @@ if (app.Environment.IsDevelopment())
             issuer: "sap-payments-adapter",
             audience: "sap-payments-adapter-clients",
             claims: new[] { new Claim("client_id", clientId) },
-            expires: DateTime.UtcNow.AddHours(1),
+            expires: DateTime.UtcNow.AddMinutes(5),
             signingCredentials: creds);
-        return Results.Ok(new { access_token = handler.WriteToken(token), expires_in = 3600 });
+        return Results.Ok(new { access_token = handler.WriteToken(token), expires_in = 300 });
     });
 }
 
