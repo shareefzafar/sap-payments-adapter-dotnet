@@ -2,7 +2,7 @@ extends: ["spectral:oas"]
 rules:
   operation-operationId: error
   operation-tags: error
-  no-unused-components-schema: warn
+  oas3-unused-component: warn
   house-error-shape-required:
     description: Every non-2xx response must reference the shared ProblemDetails schema
     given: "$.paths[*][*].responses[?(@property >= '400')]"
