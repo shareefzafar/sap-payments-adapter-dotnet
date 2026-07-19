@@ -153,7 +153,7 @@ jobs:
         env:
           ASPNETCORE_ENVIRONMENT: Development
         run: |
-          dotnet run --urls http://localhost:5000 &
-          npx wait-on http://localhost:5000/swagger/v1/swagger.json --timeout 60000
+          dotnet run --urls http://127.0.0.1:5000 &
+          npx wait-on http://127.0.0.1:5000/swagger/v1/swagger.json --timeout 60000
       - name: Run Bruno collection
         run: npx -y @usebruno/cli run "bruno/SAP Payments Adapter" --env local -r
