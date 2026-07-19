@@ -1,0 +1,29 @@
+services:
+  vault:
+    image: hashicorp/vault:1.17
+    ports:
+      - "8200:8200"
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: dev-root-token
+      VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
+      # Without this, `vault status` (and any bare `vault` CLI command run
+      # inside the container) defaults to https:// and fails with
+      # "http: server gave HTTP response to HTTPS client", since dev mode
+      # only ever listens on plain HTTP.
+      VAULT_ADDR: http://0.0.0.0:8200
+    cap_add:
+      - IPC_LOCK
+
+  vault-seed:
+    image: hashicorp/vault:1.17
+    depends_on:
+      - vault
+    environment:
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: dev-root-token
+    entrypoint: >
+      sh -c "
+      until vault status >/dev/null 2>&1; do echo 'waiting for vault...'; sleep 1; done &&
+      vault kv put -mount=secret sap-adapter/dev/rfc-credentials
+      ashost=sap-dev.internal.bank.example sysnr=00 client=100
+      rfcUser=RFC_ADAPTER_USER rfcPassword=dev-only-placeholder"

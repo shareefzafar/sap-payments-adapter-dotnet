@@ -1,0 +1,12 @@
+extends: ["spectral:oas"]
+rules:
+  operation-operationId: error
+  operation-tags: error
+  no-unused-components-schema: warn
+  house-error-shape-required:
+    description: Every non-2xx response must reference the shared ProblemDetails schema
+    given: "$.paths[*][*].responses[?(@property >= '400')]"
+    severity: error
+    then:
+      field: content.application/json.schema.$ref
+      function: truthy

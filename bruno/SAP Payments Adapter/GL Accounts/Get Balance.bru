@@ -1,0 +1,20 @@
+meta {
+  name: Get Balance
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/gl-accounts/400000/balance?fiscalYear=2026
+  body: none
+  auth: none
+}
+
+tests {
+  test("returns 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("has 12 period balances", function () {
+    expect(res.getBody().periodBalances.length).to.equal(12);
+  });
+}

@@ -1,0 +1,251 @@
+openapi: 3.1.0
+info:
+  title: SAP Payments Adapter API
+  version: 1.0.0
+  description: >
+    REST facade over the bank's legacy SAP ECC system (accessed via RFC/BAPI),
+    exposing payment initiation, vendor/customer master lookups, and GL
+    account operations to downstream modules (e.g. the Payments module).
+    This spec is the single source of truth: server DTOs and controller
+    contracts are generated from it at build time (see nswag.json). Do not
+    hand-edit generated code — change this spec and regenerate.
+  contact:
+    name: Mohammad Zafar
+servers:
+  - url: https://sap-adapter.internal.bank.example/api/v1
+    description: Internal only — not internet-facing
+
+tags:
+  - name: Payments
+  - name: Vendors
+  - name: GlAccounts
+
+paths:
+  /payments:
+    post:
+      operationId: initiatePayment
+      tags: [Payments]
+      summary: Initiate a vendor/customer payment posting in SAP (BAPI_ACC_DOCUMENT_POST)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentInitiationRequest'
+      responses:
+        '202':
+          description: Accepted — SAP posting is processed synchronously via RFC and a document number returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentInitiationResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '502':
+          $ref: '#/components/responses/SapUpstreamError'
+
+  /payments/{paymentId}:
+    get:
+      operationId: getPaymentStatus
+      tags: [Payments]
+      summary: Get payment posting status from SAP (Z_FI_GET_PAYMENT_STATUS)
+      parameters:
+        - $ref: '#/components/parameters/PaymentId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentStatusResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /vendors/{vendorId}:
+    get:
+      operationId: getVendor
+      tags: [Vendors]
+      summary: Get vendor master detail from SAP (BAPI_VENDOR_GETDETAIL)
+      parameters:
+        - $ref: '#/components/parameters/VendorId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VendorDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /gl-accounts/{glAccount}/balance:
+    get:
+      operationId: getGlAccountBalance
+      tags: [GlAccounts]
+      summary: Get GL account period balances from SAP (BAPI_GL_GETBALANCES)
+      parameters:
+        - $ref: '#/components/parameters/GlAccount'
+        - name: fiscalYear
+          in: query
+          required: true
+          schema:
+            type: integer
+            minimum: 2000
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GlAccountBalance'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /gl-accounts/{glAccount}/postings:
+    post:
+      operationId: postGlEntry
+      tags: [GlAccounts]
+      summary: Post a GL journal entry in SAP (BAPI_ACC_DOCUMENT_POST)
+      parameters:
+        - $ref: '#/components/parameters/GlAccount'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GlPostingRequest'
+      responses:
+        '202':
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentInitiationResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+
+components:
+  parameters:
+    PaymentId:
+      name: paymentId
+      in: path
+      required: true
+      schema: { type: string }
+    VendorId:
+      name: vendorId
+      in: path
+      required: true
+      schema: { type: string, pattern: '^[0-9]{1,10}$' }
+    GlAccount:
+      name: glAccount
+      in: path
+      required: true
+      schema: { type: string, pattern: '^[0-9]{1,10}$' }
+
+  responses:
+    ValidationError:
+      description: Request failed validation
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ProblemDetails' }
+    NotFound:
+      description: Resource not found in SAP
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ProblemDetails' }
+    SapUpstreamError:
+      description: SAP RFC call failed or returned an error-type BAPIRET2
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  schemas:
+    ProblemDetails:
+      type: object
+      properties:
+        type: { type: string }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        sapMessages:
+          type: array
+          items: { $ref: '#/components/schemas/BapiReturnMessage' }
+
+    BapiReturnMessage:
+      description: Mirrors SAP's standard BAPIRET2 structure
+      type: object
+      properties:
+        type: { type: string, enum: [S, E, W, I, A] }
+        id: { type: string }
+        number: { type: string }
+        message: { type: string }
+
+    PaymentInitiationRequest:
+      type: object
+      required: [companyCode, vendorId, amount, currency, paymentMethod, dueDate]
+      properties:
+        companyCode: { type: string, maxLength: 4 }
+        vendorId: { type: string }
+        amount: { type: number, format: double }
+        currency: { type: string, minLength: 3, maxLength: 3 }
+        paymentMethod: { type: string, enum: [BANK_TRANSFER, CHEQUE, DIRECT_DEBIT] }
+        dueDate: { type: string, format: date }
+        reference: { type: string, maxLength: 35 }
+
+    PaymentInitiationResponse:
+      type: object
+      properties:
+        sapDocumentNumber: { type: string }
+        fiscalYear: { type: integer }
+        status: { type: string, enum: [POSTED, PENDING, REJECTED] }
+        returnMessages:
+          type: array
+          items: { $ref: '#/components/schemas/BapiReturnMessage' }
+
+    PaymentStatusResponse:
+      type: object
+      properties:
+        paymentId: { type: string }
+        sapDocumentNumber: { type: string }
+        status: { type: string, enum: [POSTED, PENDING, REJECTED, CLEARED] }
+        clearedDate: { type: string, format: date, nullable: true }
+        returnMessages:
+          type: array
+          items: { $ref: '#/components/schemas/BapiReturnMessage' }
+
+    VendorDetail:
+      type: object
+      properties:
+        vendorId: { type: string }
+        name: { type: string }
+        companyCode: { type: string }
+        paymentTerms: { type: string }
+        bankAccountMasked: { type: string }
+        blocked: { type: boolean }
+
+    GlAccountBalance:
+      type: object
+      properties:
+        glAccount: { type: string }
+        fiscalYear: { type: integer }
+        currency: { type: string }
+        periodBalances:
+          type: array
+          items:
+            type: object
+            properties:
+              period: { type: integer }
+              debit: { type: number, format: double }
+              credit: { type: number, format: double }
+              balance: { type: number, format: double }
+
+    GlPostingRequest:
+      type: object
+      required: [companyCode, amount, currency, postingDate, docType]
+      properties:
+        companyCode: { type: string, maxLength: 4 }
+        amount: { type: number, format: double }
+        currency: { type: string, minLength: 3, maxLength: 3 }
+        postingDate: { type: string, format: date }
+        docType: { type: string, maxLength: 2 }
+        text: { type: string, maxLength: 50 }

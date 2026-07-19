@@ -1,0 +1,22 @@
+{
+  "runtime": "Net80",
+  "documentGenerator": {
+    "fromDocument": {
+      "json": "openapi/sap-payments-adapter.yaml",
+      "output": null
+    }
+  },
+  "codeGenerators": {
+    "openApiToCSharpClient": null,
+    "openApiToCSharpController": {
+      "className": "{controller}ControllerBase",
+      "namespace": "SapPaymentsAdapter.Api.Generated",
+      "output": "Generated/GeneratedControllers.cs",
+      "controllerStyle": "Abstract",
+      "controllerTarget": "AspNetCore",
+      "generateModelValidationAttributes": true,
+      "useCancellationToken": true,
+      "jsonLibrary": "SystemTextJson"
+    }
+  }
+}

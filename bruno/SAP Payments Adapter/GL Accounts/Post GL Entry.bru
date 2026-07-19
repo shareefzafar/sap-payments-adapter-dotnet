@@ -1,0 +1,28 @@
+meta {
+  name: Post GL Entry
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/gl-accounts/400000/postings
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "companyCode": "AU01",
+    "amount": 1200.50,
+    "currency": "AUD",
+    "postingDate": "2026-08-01",
+    "docType": "SA",
+    "text": "Manual journal entry - test"
+  }
+}
+
+tests {
+  test("returns 202 Accepted", function () {
+    expect(res.getStatus()).to.equal(202);
+  });
+}

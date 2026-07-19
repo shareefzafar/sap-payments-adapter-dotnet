@@ -1,0 +1,35 @@
+meta {
+  name: Initiate Payment
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/payments
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "companyCode": "AU01",
+    "vendorId": "100001",
+    "amount": 1500.00,
+    "currency": "AUD",
+    "paymentMethod": "BANK_TRANSFER",
+    "dueDate": "2026-08-01",
+    "reference": "INV-1001"
+  }
+}
+
+tests {
+  test("returns 202 Accepted", function () {
+    expect(res.getStatus()).to.equal(202);
+  });
+  test("payment is POSTED", function () {
+    expect(res.getBody().status).to.equal("POSTED");
+  });
+  test("sapDocumentNumber is present", function () {
+    expect(res.getBody().sapDocumentNumber).to.not.be.null;
+  });
+}

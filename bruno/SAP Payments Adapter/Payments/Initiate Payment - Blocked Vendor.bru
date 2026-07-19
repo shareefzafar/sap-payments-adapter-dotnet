@@ -1,0 +1,32 @@
+meta {
+  name: Initiate Payment - Blocked Vendor
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/payments
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "companyCode": "AU01",
+    "vendorId": "100002",
+    "amount": 500.00,
+    "currency": "AUD",
+    "paymentMethod": "BANK_TRANSFER",
+    "dueDate": "2026-08-01"
+  }
+}
+
+tests {
+  test("returns 400 for blocked vendor", function () {
+    expect(res.getStatus()).to.equal(400);
+  });
+  test("response is REJECTED with a SAP error message", function () {
+    expect(res.getBody().status).to.equal("REJECTED");
+    expect(res.getBody().returnMessages[0].type).to.equal("E");
+  });
+}

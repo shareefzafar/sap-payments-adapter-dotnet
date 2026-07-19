@@ -1,0 +1,17 @@
+meta {
+  name: Get Payment Status
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/payments/5100001
+  body: none
+  auth: none
+}
+
+tests {
+  test("returns 200 or 404 depending on prior run", function () {
+    expect([200, 404]).to.include(res.getStatus());
+  });
+}

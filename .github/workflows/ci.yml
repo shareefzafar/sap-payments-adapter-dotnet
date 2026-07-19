@@ -1,0 +1,149 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+env:
+  DOTNET_VERSION: '8.0.x'
+
+jobs:
+  spec-lint:
+    name: Lint OpenAPI contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npx -y @stoplight/spectral-cli lint src/SapPaymentsAdapter.Api/openapi/sap-payments-adapter.yaml --ruleset .spectral.yaml
+
+  codegen-diff-check:
+    name: Verify generated code matches the spec
+    needs: spec-lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+      - name: Regenerate into a temp path
+        working-directory: src/SapPaymentsAdapter.Api
+        run: |
+          dotnet tool restore
+          cp Generated/GeneratedControllers.cs /tmp/before.cs
+          dotnet tool run nswag run nswag.json
+      - name: Fail if committed generated code is stale
+        working-directory: src/SapPaymentsAdapter.Api
+        run: |
+          if ! diff -q /tmp/before.cs Generated/GeneratedControllers.cs > /dev/null; then
+            echo "::error::Generated/GeneratedControllers.cs is out of date with openapi/sap-payments-adapter.yaml. Run 'dotnet tool run nswag run nswag.json' and commit the result."
+            git diff /tmp/before.cs Generated/GeneratedControllers.cs || true
+            exit 1
+          fi
+
+  build-and-test:
+    name: Build, unit + integration tests
+    needs: codegen-diff-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+      - run: dotnet restore SapPaymentsAdapter.sln
+      - run: dotnet build SapPaymentsAdapter.sln --no-restore -c Release
+      - name: Unit tests
+        run: dotnet test tests/SapPaymentsAdapter.UnitTests --no-build -c Release --collect:"XPlat Code Coverage" --results-directory ./coverage
+      - name: Integration tests
+        run: dotnet test tests/SapPaymentsAdapter.IntegrationTests --no-build -c Release --collect:"XPlat Code Coverage" --results-directory ./coverage
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: ./coverage
+
+  sonarqube:
+    name: SonarQube quality gate
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          name: coverage
+          path: ./coverage
+      - uses: SonarSource/sonarqube-scan-action@v3
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+      - uses: SonarSource/sonarqube-quality-gate-action@v1
+        timeout-minutes: 5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+  claude-pr-review:
+    name: Agentic PR review (Claude Code)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Claude Code review
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          direct_prompt: |
+            Review this PR against the OpenAPI contract in
+            src/SapPaymentsAdapter.Api/openapi/sap-payments-adapter.yaml.
+            Flag: (1) any controller/service change that doesn't match the
+            spec, (2) SAP BAPIRET2 return rows not checked before trusting
+            export data, (3) missing unit/integration test coverage for new
+            endpoints, (4) secrets or credentials read from anywhere other
+            than Vault. Keep it to the 3 most significant findings.
+      # This is a first-pass automated reviewer, not a merge gate — keep a
+      # human as the required final approver on branch protection rules,
+      # particularly given this touches payment posting logic.
+
+  bruno-e2e:
+    name: Bruno E2E against a running instance
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    services:
+      vault:
+        image: hashicorp/vault:1.17
+        ports: ['8200:8200']
+        env:
+          VAULT_DEV_ROOT_TOKEN_ID: dev-root-token
+          VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
+        options: --cap-add=IPC_LOCK
+    env:
+      VAULT_ADDR: http://localhost:8200
+      VAULT_TOKEN: dev-root-token
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Seed Vault dev secret
+        run: |
+          curl -s -X POST -H "X-Vault-Token: dev-root-token" \
+            -d '{"data":{"ashost":"sap-dev.internal.bank.example","sysnr":"00","client":"100","rfcUser":"RFC_ADAPTER_USER","rfcPassword":"ci-placeholder"}}' \
+            http://localhost:8200/v1/secret/data/sap-adapter/dev/rfc-credentials
+      - name: Start API
+        working-directory: src/SapPaymentsAdapter.Api
+        run: |
+          dotnet run --urls http://localhost:5000 &
+          npx wait-on http://localhost:5000/swagger/v1/swagger.json --timeout 60000
+      - name: Run Bruno collection
+        run: npx -y @usebruno/cli run "bruno/SAP Payments Adapter" --env local -r

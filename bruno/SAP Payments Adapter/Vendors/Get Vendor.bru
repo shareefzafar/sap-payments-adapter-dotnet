@@ -1,0 +1,20 @@
+meta {
+  name: Get Vendor
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/vendors/100001
+  body: none
+  auth: none
+}
+
+tests {
+  test("returns 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("vendor is not blocked", function () {
+    expect(res.getBody().blocked).to.equal(false);
+  });
+}
