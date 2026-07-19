@@ -19,6 +19,11 @@ startup; the OpenAPI spec feeds generated controller code in at build
 time (contract-first, see "Why this design" below); Bruno drives E2E
 tests against the running instance.
 
+New to this codebase? **[docs/CODEBASE_GUIDE.md](docs/CODEBASE_GUIDE.md)**
+walks through where to start reading, a full end-to-end request trace,
+why there are three layers of tests, and what's actually been verified
+versus still assumed.
+
 ## Status
 
 `dotnet build` succeeds clean — API, unit tests, and integration tests all
