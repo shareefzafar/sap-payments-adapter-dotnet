@@ -1,0 +1,108 @@
+<svg viewBox="0 0 1000 720" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#374151"/>
+    </marker>
+    <marker id="arrowDashed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#6b7280"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1000" height="720" fill="#ffffff"/>
+
+  <!-- Title -->
+  <text x="500" y="30" text-anchor="middle" font-size="18" font-weight="700" fill="#111827">SAP Payments Adapter — Architecture</text>
+
+  <!-- Downstream module (client) -->
+  <rect x="400" y="55" width="200" height="50" rx="8" fill="#dbeafe" stroke="#2563eb" stroke-width="1.5"/>
+  <text x="500" y="85" text-anchor="middle" font-size="14" fill="#1e3a8a" font-weight="600">Payments Module (client)</text>
+
+  <line x1="500" y1="105" x2="500" y2="135" stroke="#374151" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="515" y="123" font-size="11" fill="#6b7280">REST / JSON</text>
+
+  <!-- API boundary box -->
+  <rect x="120" y="140" width="760" height="330" rx="10" fill="#f9fafb" stroke="#9ca3af" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <text x="140" y="162" font-size="13" font-weight="700" fill="#374151">SapPaymentsAdapter.Api  (ASP.NET Core, .NET 8)</text>
+
+  <!-- Controller -->
+  <rect x="380" y="180" width="240" height="50" rx="8" fill="#e0e7ff" stroke="#4338ca" stroke-width="1.5"/>
+  <text x="500" y="210" text-anchor="middle" font-size="13" fill="#312e81" font-weight="600">SapAdapterController</text>
+
+  <line x1="500" y1="230" x2="500" y2="258" stroke="#374151" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Domain services -->
+  <rect x="150" y="260" width="190" height="55" rx="8" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5"/>
+  <text x="245" y="284" text-anchor="middle" font-size="12.5" fill="#14532d" font-weight="600">PaymentsService</text>
+  <text x="245" y="300" text-anchor="middle" font-size="10.5" fill="#166534">initiate / status</text>
+
+  <rect x="405" y="260" width="190" height="55" rx="8" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5"/>
+  <text x="500" y="284" text-anchor="middle" font-size="12.5" fill="#14532d" font-weight="600">VendorsService</text>
+  <text x="500" y="300" text-anchor="middle" font-size="10.5" fill="#166534">vendor / customer master</text>
+
+  <rect x="660" y="260" width="190" height="55" rx="8" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5"/>
+  <text x="755" y="284" text-anchor="middle" font-size="12.5" fill="#14532d" font-weight="600">GlAccountsService</text>
+  <text x="755" y="300" text-anchor="middle" font-size="10.5" fill="#166534">balance / posting</text>
+
+  <line x1="245" y1="230" x2="245" y2="260" stroke="#374151" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="755" y1="230" x2="755" y2="260" stroke="#374151" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- converge to ISapConnector -->
+  <line x1="245" y1="315" x2="500" y2="350" stroke="#374151" stroke-width="1.5"/>
+  <line x1="500" y1="315" x2="500" y2="350" stroke="#374151" stroke-width="1.5"/>
+  <line x1="755" y1="315" x2="500" y2="350" stroke="#374151" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- ISapConnector interface -->
+  <rect x="380" y="352" width="240" height="45" rx="8" fill="#fef3c7" stroke="#b45309" stroke-width="1.5"/>
+  <text x="500" y="380" text-anchor="middle" font-size="12.5" fill="#78350f" font-weight="600">ISapConnector (interface)</text>
+
+  <line x1="500" y1="397" x2="500" y2="423" stroke="#374151" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- SapBapiSimulator -->
+  <rect x="330" y="425" width="340" height="55" rx="8" fill="#fef9c3" stroke="#a16207" stroke-width="1.5"/>
+  <text x="500" y="449" text-anchor="middle" font-size="12.5" fill="#713f12" font-weight="600">SapBapiSimulator</text>
+  <text x="500" y="465" text-anchor="middle" font-size="10.5" fill="#854d0e">BAPI_ACC_DOCUMENT_POST · BAPI_VENDOR_GETDETAIL · BAPI_GL_GETBALANCES</text>
+
+  <!-- Vault -->
+  <rect x="30" y="425" width="150" height="55" rx="8" fill="#fee2e2" stroke="#b91c1c" stroke-width="1.5"/>
+  <text x="105" y="449" text-anchor="middle" font-size="12.5" fill="#7f1d1d" font-weight="600">HashiCorp Vault</text>
+  <text x="105" y="465" text-anchor="middle" font-size="10.5" fill="#991b1b">RFC credentials (KV v2)</text>
+
+  <line x1="180" y1="452" x2="325" y2="452" stroke="#374151" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="205" y="443" font-size="10" fill="#6b7280">VaultService (startup)</text>
+
+  <!-- real SAP swap-in, outside boundary -->
+  <rect x="380" y="565" width="240" height="55" rx="8" fill="#f3f4f6" stroke="#6b7280" stroke-width="1.5" stroke-dasharray="5,3"/>
+  <text x="500" y="589" text-anchor="middle" font-size="12.5" fill="#374151" font-weight="600">Real SAP ECC (RFC/BAPI)</text>
+  <text x="500" y="605" text-anchor="middle" font-size="10.5" fill="#6b7280">swap in later via NCo — nothing above changes</text>
+
+  <line x1="500" y1="480" x2="500" y2="563" stroke="#6b7280" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrowDashed)"/>
+
+  <!-- Contract-first codegen path -->
+  <rect x="720" y="510" width="230" height="45" rx="8" fill="#ede9fe" stroke="#6d28d9" stroke-width="1.5"/>
+  <text x="835" y="538" text-anchor="middle" font-size="12" fill="#4c1d95" font-weight="600">openapi/sap-payments-adapter.yaml</text>
+
+  <line x1="835" y1="510" x2="835" y2="235" stroke="#6d28d9" stroke-width="1.5" stroke-dasharray="5,3"/>
+  <line x1="835" y1="235" x2="622" y2="200" stroke="#6d28d9" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrowDashed)"/>
+  <text x="845" y="380" font-size="10.5" fill="#6d28d9" transform="rotate(90 845 380)">NSwag codegen (build-time)</text>
+
+  <!-- Bruno testing -->
+  <rect x="30" y="55" width="150" height="50" rx="8" fill="#cffafe" stroke="#0e7490" stroke-width="1.5"/>
+  <text x="105" y="76" text-anchor="middle" font-size="12.5" fill="#164e63" font-weight="600">Bruno</text>
+  <text x="105" y="92" text-anchor="middle" font-size="10.5" fill="#155e75">local / CI E2E tests</text>
+  <line x1="105" y1="105" x2="105" y2="140" stroke="#0e7490" stroke-width="1.5" stroke-dasharray="5,3"/>
+  <line x1="105" y1="140" x2="380" y2="200" stroke="#0e7490" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrowDashed)"/>
+
+  <!-- Legend -->
+  <g font-size="10.5" fill="#6b7280">
+    <rect x="30" y="655" width="12" height="12" fill="#e0e7ff" stroke="#4338ca"/>
+    <text x="48" y="665">Controller (generated abstract base + concrete impl)</text>
+    <rect x="30" y="675" width="12" height="12" fill="#dcfce7" stroke="#16a34a"/>
+    <text x="48" y="685">Domain service</text>
+    <rect x="330" y="655" width="12" height="12" fill="#fef9c3" stroke="#a16207"/>
+    <text x="348" y="665">SAP simulation layer (swappable for real NCo)</text>
+    <rect x="330" y="675" width="12" height="12" fill="#fee2e2" stroke="#b91c1c"/>
+    <text x="348" y="685">Secrets</text>
+    <line x1="650" y1="661" x2="675" y2="661" stroke="#6d28d9" stroke-width="1.5" stroke-dasharray="5,3"/>
+    <text x="680" y="665">Contract-first codegen flow</text>
+  </g>
+</svg>

@@ -6,6 +6,14 @@ using SapPaymentsAdapter.Api.Services.Vendors;
 
 namespace SapPaymentsAdapter.Api.Controllers;
 
+/// <summary>
+/// NSwag grouped all 5 operations from the spec into a single abstract base
+/// (ControllerBaseControllerBase) rather than one controller per tag - see
+/// README for the nswag.json setting that would split this if you want
+/// separate controllers later. For now this one concrete class implements
+/// every abstract method and delegates to the three domain services, so
+/// the domain separation still exists one layer down.
+/// </summary>
 public class SapAdapterController : ControllerBaseControllerBase
 {
     private readonly IPaymentsService _paymentsService;

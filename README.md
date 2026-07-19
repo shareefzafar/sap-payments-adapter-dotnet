@@ -6,6 +6,19 @@ balance/posting to downstream modules such as Payments. Built as hands-on
 practice for a role doing exactly this, on top of the existing InsureFlow
 .NET port (same DI/middleware/test conventions carried over).
 
+## Architecture
+
+![SAP Payments Adapter architecture](docs/architecture.svg)
+
+Request flow: the Payments module (or any downstream consumer) calls
+`SapAdapterController` → domain services (`PaymentsService`,
+`VendorsService`, `GlAccountsService`) → `ISapConnector` →
+`SapBapiSimulator` today, a real NCo-based implementation later without
+anything above the interface changing. Vault feeds RFC credentials in at
+startup; the OpenAPI spec feeds generated controller code in at build
+time (contract-first, see "Why this design" below); Bruno drives E2E
+tests against the running instance.
+
 ## Status
 
 `dotnet build` succeeds clean — API, unit tests, and integration tests all
