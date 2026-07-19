@@ -63,26 +63,34 @@ jobs:
           name: coverage
           path: ./coverage
 
-  sonarqube:
-    name: SonarQube quality gate
-    needs: build-and-test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: actions/download-artifact@v4
-        with:
-          name: coverage
-          path: ./coverage
-      - uses: SonarSource/sonarqube-scan-action@v3
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-      - uses: SonarSource/sonarqube-quality-gate-action@v1
-        timeout-minutes: 5
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+  # SonarQube analysis intentionally does NOT run in this pipeline.
+  # GitHub-hosted runners are cloud VMs with no network path to a local
+  # SonarQube instance (http://localhost:9000) — setting SONAR_HOST_URL to
+  # a localhost address here would just fail trying to connect to itself.
+  # Run SonarQube locally instead (see README) and re-enable this job only
+  # if/when a reachable SonarQube host (e.g. SonarCloud, or a hosted
+  # SonarQube server) is available.
+  #
+  # sonarqube:
+  #   name: SonarQube quality gate
+  #   needs: build-and-test
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #       with:
+  #         fetch-depth: 0
+  #     - uses: actions/download-artifact@v4
+  #       with:
+  #         name: coverage
+  #         path: ./coverage
+  #     - uses: SonarSource/sonarqube-scan-action@v3
+  #       env:
+  #         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+  #         SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+  #     - uses: SonarSource/sonarqube-quality-gate-action@v1
+  #       timeout-minutes: 5
+  #       env:
+  #         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
   claude-pr-review:
     name: Agentic PR review (Claude Code)

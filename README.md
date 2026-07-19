@@ -128,6 +128,35 @@ you touch this again:
   Production should move to AppRole auth and, where SAP's own auth model
   allows it, short-lived dynamic secrets rather than static KV entries.
 
+## Running SonarQube locally
+
+The CI pipeline deliberately does **not** run SonarQube — GitHub-hosted
+runners are cloud VMs with no network path to a local SonarQube instance,
+so pointing `SONAR_HOST_URL` at `http://localhost:9000` from CI would just
+fail trying to connect to itself. Two real fixes exist (a self-hosted
+GitHub Actions runner registered to this machine, or switching to
+SonarCloud, which is internet-reachable), but for hands-on purposes
+SonarQube is run manually against the local instance instead — same
+pattern used in the [insurance-claims-platform](https://github.com/shareefzafar/insurance-claims-platform)
+project.
+
+```bash
+# Install the scanner once
+dotnet tool install --global dotnet-sonarscanner
+
+# From the repo root, wrapping a normal build:
+dotnet sonarscanner begin /k:"sap-payments-adapter-dotnet" /d:sonar.host.url="http://localhost:9000" /d:sonar.token="<your local Sonar token>"
+dotnet build
+dotnet sonarscanner end /d:sonar.token="<your local Sonar token>"
+```
+
+Get the token from your local SonarQube: **My Account** → **Security** →
+**Generate Token**. Dashboard afterward:
+`http://localhost:9000/dashboard?id=sap-payments-adapter-dotnet`.
+
+Results from the most recent local run: *(fill in after running — not yet
+executed against this project)*.
+
 ## Security
 
 The initial build had a genuine gap: no authentication at all — anyone
