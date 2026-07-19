@@ -15,6 +15,9 @@ servers:
   - url: https://sap-adapter.internal.bank.example/api/v1
     description: Internal only — not internet-facing
 
+security:
+  - bearerAuth: []
+
 tags:
   - name: Payments
   - name: Vendors
@@ -125,6 +128,15 @@ paths:
           $ref: '#/components/responses/ValidationError'
 
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: >
+        JWT issued by the bank's identity provider (internal STS / Azure AD
+        in production; a local /dev/token endpoint for hands-on testing).
+
   parameters:
     PaymentId:
       name: paymentId

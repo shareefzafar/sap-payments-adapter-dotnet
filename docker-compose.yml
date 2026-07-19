@@ -26,4 +26,6 @@ services:
       until vault status >/dev/null 2>&1; do echo 'waiting for vault...'; sleep 1; done &&
       vault kv put -mount=secret sap-adapter/dev/rfc-credentials
       ashost=sap-dev.internal.bank.example sysnr=00 client=100
-      rfcUser=RFC_ADAPTER_USER rfcPassword=dev-only-placeholder"
+      rfcUser=RFC_ADAPTER_USER rfcPassword=dev-only-placeholder &&
+      vault kv put -mount=secret sap-adapter/dev/jwt-signing-key
+      signingKey=dev-only-signing-key-not-for-production-use-replace-me"

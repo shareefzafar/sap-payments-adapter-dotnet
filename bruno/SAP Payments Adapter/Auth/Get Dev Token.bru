@@ -1,0 +1,24 @@
+meta {
+  name: Get Dev Token
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/dev/token?clientId=payments-module
+  body: none
+  auth: none
+}
+
+script:post-response {
+  if (res.getStatus() === 200) {
+    bru.setVar("token", res.getBody().access_token);
+  }
+}
+
+tests {
+  test("returns 200 with an access token", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().access_token).to.not.be.null;
+  });
+}

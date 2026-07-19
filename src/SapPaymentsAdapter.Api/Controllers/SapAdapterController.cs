@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SapPaymentsAdapter.Api.Generated;
 using SapPaymentsAdapter.Api.Services.GlAccounts;
@@ -13,7 +14,12 @@ namespace SapPaymentsAdapter.Api.Controllers;
 /// separate controllers later. For now this one concrete class implements
 /// every abstract method and delegates to the three domain services, so
 /// the domain separation still exists one layer down.
+///
+/// [Authorize] requires a valid JWT bearer token on every operation - see
+/// Program.cs for the validation setup and the /dev/token endpoint used to
+/// mint test tokens locally (Development environment only).
 /// </summary>
+[Authorize]
 public class SapAdapterController : ControllerBaseControllerBase
 {
     private readonly IPaymentsService _paymentsService;

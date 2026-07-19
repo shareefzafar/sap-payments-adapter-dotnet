@@ -31,8 +31,21 @@ compile on Windows with .NET 8 SDK + .NET 8/10 runtimes installed
 side-by-side. `dotnet run` also succeeds end to end: the app starts,
 fetches the SAP RFC credentials from Vault (confirmed via the masked
 startup log lines), and listens on `http://localhost:5000`. `dotnet test`
-and the Bruno E2E run against a live instance still haven't been executed
-yet.
+now passes clean too — **11/11 tests, 0 failures** (both unit and
+integration suites), confirming the vendor-not-found → 404 path, the
+successful payment → SAP document number path, the blocked-vendor →
+rejection-without-throwing path, and the GL balance lookup all work as
+designed. The Bruno E2E run against a live instance is now fully green
+too — **7/7 requests, 12/12 tests, 0 failures**, including full JWT
+auth: `Get Dev Token` mints a token, and every subsequent request
+(`Get Vendor`, `Get Balance`, `Post GL Entry`, `Initiate Payment`,
+blocked-vendor rejection, and payment status lookup) authenticates
+successfully and returns the expected status code. Getting here required
+adding explicit `folder.bru` sequencing (Auth → seq 1, so the token gets
+minted before anything that needs it) — the CLI's default folder
+discovery order turned out not to be alphabetical as assumed, which
+initially caused every protected request to run before the token existed
+and fail with 401.
 
 One environment gotcha found while running it: `dotnet run` defaults to
 the **`Production`** environment, and `Program.cs` only enables Swagger UI
@@ -114,6 +127,42 @@ you touch this again:
   (`docker-compose.yml` spins up a Vault dev server and seeds the path).
   Production should move to AppRole auth and, where SAP's own auth model
   allows it, short-lived dynamic secrets rather than static KV entries.
+
+## Security
+
+The initial build had a genuine gap: no authentication at all — anyone
+who could reach the API could post payments. Fixed with JWT bearer auth:
+
+- **`[Authorize]`** on `SapAdapterController` — every one of the 5
+  operations now requires a valid bearer token; unauthenticated requests
+  get `401`.
+- **Validation setup** (`Program.cs`): issuer, audience, lifetime, and
+  signature are all checked. The signing key is symmetric (HMAC) and read
+  from Vault (`sap-adapter/dev/jwt-signing-key`) — **this is a
+  hands-on-practice simplification, not a production pattern**. A real
+  bank deployment would validate against an actual identity provider's
+  public keys (RS256 + JWKS endpoint — internal STS or Azure AD), not a
+  shared secret, and would check `aud`/`scope` claims to enforce which
+  modules are allowed to call which operations rather than trusting any
+  valid token equally.
+- **`POST /dev/token`** — a token-minting endpoint registered *only* under
+  `Development` environment, purely so Bruno / manual testing can get a
+  working token without a real IDP in the loop. This must never exist in
+  a deployed environment; it's explicitly gated by
+  `if (app.Environment.IsDevelopment())` in `Program.cs` for that reason.
+- **Bruno**: a new `Auth/Get Dev Token` request calls `/dev/token` and
+  stashes the result in a `{{token}}` collection variable via a
+  post-response script; every other request now sends
+  `Authorization: Bearer {{token}}`. Run "Get Dev Token" first (or as
+  part of a full collection run, since it's sequenced first) before the
+  other requests, or they'll 401.
+
+Still open on the security side: no RBAC/scope enforcement beyond "valid
+token = full access", no rate limiting, no mTLS between this adapter and
+its callers (typical for internal bank service-to-service traffic), and
+Vault access still uses a long-lived dev token rather than AppRole (see
+"What's still to do" below — this was already flagged for the RFC
+credentials and now applies to the JWT signing key too).
 
 ## REST design principles applied
 

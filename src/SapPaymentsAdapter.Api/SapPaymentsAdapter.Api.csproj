@@ -17,6 +17,9 @@
     <!-- Vault for secrets / SAP RFC credentials -->
     <PackageReference Include="VaultSharp" Version="1.13.0.1" />
 
+    <!-- JWT bearer authentication -->
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.10" />
+
     <!-- Validation -->
     <PackageReference Include="FluentValidation.AspNetCore" Version="11.3.0" />
   </ItemGroup>
