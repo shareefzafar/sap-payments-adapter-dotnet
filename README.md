@@ -283,14 +283,14 @@ domain services even though they live in one generated base class.
 
 | Tool | Why | Install |
 |---|---|---|
-| **.NET 8 SDK** | build/run/test — `net8.0` is still the project's `TargetFramework` even if you also have .NET 10 installed for other work | `winget install Microsoft.DotNet.SDK.8` (Windows) · `brew install --cask dotnet-sdk` (macOS) · [dotnet.microsoft.com/download](https://dotnet.microsoft.com/download) (Linux/other). Verify: `dotnet --list-runtimes` should show a `Microsoft.NETCore.App 8.x.x` line — if you only have .NET 10's runtime installed, the NSwag codegen tool (which targets net8.0) fails to launch with a generic MSB3073 error. Both versions install and run side by side without conflict. |
+| **.NET 8 SDK** | build/run/test — `net8.0` is still the project's `TargetFramework` even if you also have .NET 10 installed for other work. A repo-root `global.json` pins the SDK to a specific 8.0.x version so local tool resolution (NSwag codegen) matches what CI uses — if you don't have that exact patch installed, either update `global.json` to the version `dotnet --list-sdks` shows you, or install it. | `winget install Microsoft.DotNet.SDK.8` (Windows) · `brew install --cask dotnet-sdk` (macOS) · [dotnet.microsoft.com/download](https://dotnet.microsoft.com/download) (Linux/other). Verify: `dotnet --list-sdks` and `dotnet --version` (the latter should reflect whatever `global.json` pins, confirming the pin is actually taking effect) — if you only have .NET 10 installed, the NSwag codegen tool refuses to run with a runtime-mismatch error rather than a generic MSB3073 one. Both versions install and run side by side without conflict. |
 | **IDE** | edit/debug | VS Code + [C# Dev Kit extension](https://marketplace.visualstudio.com/items?itemName=ms-dotnettools.csdevkit) *(lightest)*, or [JetBrains Rider](https://www.jetbrains.com/rider/download/), or Visual Studio 2022 (Windows, ASP.NET workload). Any of the three opens `SapPaymentsAdapter.sln` directly. |
 | **Docker Desktop** | runs the Vault dev server via `docker-compose.yml` | [docker.com/products/docker-desktop](https://www.docker.com/products/docker-desktop/). Verify: `docker compose version` |
 | **Node.js + npm** | only for local Spectral spec-lint (`npx @stoplight/spectral-cli`) and Bruno CLI | [nodejs.org](https://nodejs.org) (LTS). Verify: `node -v` |
 | **Bruno** | local API testing | Desktop app from [usebruno.com](https://www.usebruno.com/downloads) *(open `bruno/SAP Payments Adapter` as a collection folder)*, or CLI: `npm install -g @usebruno/cli` → `bru --version` |
 | **Vault CLI** *(optional)* | poke at secrets manually outside the app | **Windows**: download `vault_2.0.3_windows_amd64.zip` from [releases.hashicorp.com/vault](https://releases.hashicorp.com/vault) (not `darwin` — that's macOS), extract to a folder e.g. `C:\vault\`, add that folder to your **`Path`** system/user variable (Edit environment variables → select the existing `Path` entry → New → add the folder — don't create a separate variable named `vault`), open a **new** terminal, verify with `vault --version`. **macOS**: `brew install vault`. Not required if you only go through `docker-compose` + the app's own Vault client. |
 | **act** *(optional)* | run `.github/workflows/ci.yml` locally in Docker before pushing | `brew install act` · [github.com/nektos/act](https://github.com/nektos/act#installation). Needs Docker Desktop running. |
-| **SonarQube** *(optional locally)* | the `sonarqube` CI job needs somewhere to report to | Either run `docker run -d -p 9000:9000 sonarqube` locally, or sign up for a free [SonarCloud](https://sonarcloud.io) account — either way you'll need to set `SONAR_TOKEN`/`SONAR_HOST_URL` as GitHub repo secrets for the CI job to do anything. |
+| **SonarQube** *(optional, local-only)* | CI deliberately does not run SonarQube (GitHub-hosted runners can't reach `localhost` — see "Running SonarQube locally" below); run it locally if you want the quality-gate feedback | Either run `docker run -d -p 9000:9000 sonarqube` locally, or sign up for a free [SonarCloud](https://sonarcloud.io) account (internet-reachable, so it *could* be wired into CI later if that path is preferred over local-only). |
 | **NSwag CLI** | contract → code generation | No separate install — pulled automatically as a local dotnet tool via the `NSwag.MSBuild` package reference the first time you `dotnet build`. |
 | **[Claude Code](https://code.claude.com)** *(optional but recommended here)* | run `dotnet build`/`dotnet test` for you and iterate on real compiler errors | `npm install -g @anthropic-ai/claude-code`, then run `claude` from the repo root. Also what the bank's agentic PR review job (`claude-code-action`) in CI is built on. |
 
@@ -349,11 +349,90 @@ dotnet test tests/SapPaymentsAdapter.IntegrationTests
 ## CI pipeline (`.github/workflows/ci.yml`)
 
 `spec-lint` (Spectral) → `codegen-diff-check` → `build-and-test` (unit +
-integration, coverage uploaded) → `sonarqube` (quality-gate-blocking) +
-`claude-pr-review` (agentic first-pass review via
-`anthropics/claude-code-action@v1`, human remains required final approver)
-→ `bruno-e2e` (spins up Vault + the API, runs the Bruno collection against
-a live instance).
+integration, coverage uploaded) → `claude-pr-review` (agentic first-pass
+review via `anthropics/claude-code-action@v1`, human remains required
+final approver) → `bruno-e2e` (spins up Vault + the API, runs the Bruno
+collection against a live instance). SonarQube runs locally only, not in
+CI — see "Running SonarQube locally" below for why.
+
+### CI pipeline gotchas found running it on a real GitHub Actions runner
+
+None of this showed up in local `dotnet build`/`dotnet test` — every one
+of these only surfaced once the pipeline actually ran on GitHub-hosted
+runners, which is exactly the point of having CI at all:
+
+- **Spectral's built-in "unused schema" rule doesn't exist under the name
+  you'd guess.** `.spectral.yaml` originally extended
+  `no-unused-components-schema`; the real rule name is
+  `oas3-unused-component`. Wrong name → `spec-lint` fails immediately with
+  "Cannot extend non-existing rule," before it even gets to linting the
+  actual spec.
+- **Custom Spectral rules that check for a literal `$ref` field fight
+  Spectral's own ref resolution.** The house `house-error-shape-required`
+  rule originally checked `content.application/json.schema.$ref` for
+  truthy. With Spectral's default `resolved: true`, that field gets
+  replaced by the fully-resolved schema before the rule runs — the `$ref`
+  is gone by the time it's checked. Setting `resolved: false` "fixes" that
+  but breaks differently for responses that themselves are shared
+  `$ref`s (e.g. `$ref: '#/components/responses/ValidationError'`), since
+  the unresolved response object has no `content` field at all — it's
+  just a pointer. The actual fix: leave `resolved: true` (the default)
+  and check for a property that survives resolution either way — this
+  spec checks `content.application/json.schema.properties.sapMessages`,
+  since that only exists once resolution has fully expanded down to the
+  shared `ProblemDetails` schema.
+- **`codegen-diff-check` needs its own committed baseline, and two files
+  weren't committed at all.** `.config/dotnet-tools.json` (the NSwag tool
+  manifest `dotnet tool restore` needs) was created locally but never
+  `git add`ed, and `Generated/GeneratedControllers.cs` was still matched
+  by a `.gitignore` rule left over from before this became a
+  contract-first project. Without both committed, `dotnet tool restore`
+  has nothing to restore and there's no baseline to diff a fresh
+  regeneration against.
+- **NSwag's `/runtime:` override doesn't actually work once the tool has
+  resolved to a specific framework build** (confirmed upstream:
+  [NSwag#5335](https://github.com/RicoSuter/nswag/issues/5335)). If a
+  machine has both .NET 8 and .NET 10 SDKs installed, `dotnet tool run
+  nswag` may resolve to the `net10.0` build of the tool even though
+  `nswag.json` declares `"runtime": "Net80"` — and the suggested
+  `/runtime:Net80` fix in the error message doesn't apply for the global
+  tool shim. Real fix: a repo-root `global.json` pinning the SDK to a
+  specific installed 8.0.x version, so `dotnet tool run` resolves the
+  *same* framework build locally that CI gets from
+  `actions/setup-dotnet` with `dotnet-version: '8.0.x'`.
+- **Integration tests were written before JWT auth existed** and never
+  got updated — once `[Authorize]` landed on `SapAdapterController`, all
+  four integration tests started failing with 401 instead of their
+  expected status codes. Fixed with a dedicated
+  `AuthenticatedApiFactory : WebApplicationFactory<Program>` fixture that
+  forces the `Development` environment (`WebApplicationFactory`'s
+  documented default of `Development` isn't reliable for minimal-hosting
+  apps — [dotnet/aspnetcore#33889](https://github.com/dotnet/aspnetcore/issues/33889))
+  and mints a token via `POST /dev/token` once per test class.
+- **`dotnet run` in the `bruno-e2e` job defaults to the `Production`
+  environment** (GitHub runners don't set `ASPNETCORE_ENVIRONMENT`), and
+  both `/swagger` and `/dev/token` are gated behind
+  `IsDevelopment()` — so the API came up, but neither the health-check
+  endpoint nor the auth-token endpoint the Bruno collection needs was
+  actually registered. Fixed by setting
+  `ASPNETCORE_ENVIRONMENT: Development` explicitly on that step.
+- **`localhost` resolution between Node and Kestrel is flaky on
+  `ubuntu-latest` runners.** Node 18+ resolves `localhost` to the IPv6
+  loopback (`::1`) first; Kestrel's dual-stack `localhost` binding
+  doesn't reliably pair with that on GitHub's runners. Fixed by binding
+  and polling `127.0.0.1` explicitly everywhere in that job instead of
+  `localhost`.
+- **`wait-on`'s default `http://` scheme sends a HEAD request**, but
+  Swashbuckle's `SwaggerMiddleware` (serving `/swagger/v1/swagger.json`)
+  only handles `GET` — every HEAD poll 404s even while the app is fully
+  up and listening, so `wait-on` times out regardless. Fixed by using the
+  `http-get://` prefix to force a GET request instead.
+- **Bruno's CLI requires its current working directory to be the
+  collection root** (where `bruno.json` lives) — passing the collection
+  path as an argument from the repo root fails with "You can run only at
+  the root of a collection." Fixed with `working-directory: "bruno/SAP
+  Payments Adapter"` on that step, running `bru run --env local -r` from
+  inside it instead.
 
 ## What's still to do
 
@@ -367,6 +446,9 @@ a live instance).
   wired to a request pipeline filter — add `ValidationFilter` or per-DTO
   validators and 400 responses for malformed requests
 - AppRole auth for Vault instead of the dev token
-- Push to a real GitHub repo and confirm `.github/workflows/ci.yml`
-  actually runs end to end (spec-lint, codegen-diff-check, SonarQube,
-  Claude Code PR review, Bruno e2e) — none of it has executed for real yet
+- The `bruno-e2e` job's Bruno collection run itself (the step after the
+  fixes described in "CI pipeline gotchas" above) hasn't been confirmed
+  green end-to-end yet on a fresh push — the environment, networking, and
+  invocation issues around it are fixed, but worth watching the next
+  CI run to confirm the actual assertions pass, not just that the tool
+  invocations succeed

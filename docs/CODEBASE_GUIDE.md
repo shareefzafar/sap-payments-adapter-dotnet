@@ -116,10 +116,18 @@ asked "why three kinds of tests?" in an interview.
   never exist in a real deployment.
 - **GitHub Actions CI** — `spec-lint` (catches bad OpenAPI before it
   becomes bad code) → `codegen-diff-check` (catches someone forgetting
-  to regenerate) → `build-and-test` → `sonarqube` (quality gate) +
-  `claude-pr-review` (agentic first-pass review, human stays the real
-  approver) → `bruno-e2e` (the same test run locally, run against a
-  fresh instance in CI).
+  to regenerate) → `build-and-test` → `claude-pr-review` (agentic
+  first-pass review, human stays the real approver) → `bruno-e2e` (the
+  same test run locally, run against a fresh instance in CI). SonarQube
+  runs locally only — GitHub-hosted runners can't reach `localhost`.
+  Getting every stage of this actually green on a real runner surfaced a
+  long list of environment-specific issues invisible to local
+  `dotnet build`/`dotnet test` — see "CI pipeline gotchas found running
+  it on a real GitHub Actions runner" in the README for the full list
+  (Spectral rule naming, ref resolution timing, committed codegen
+  baselines, SDK/tool version pinning, auth retrofitted into integration
+  tests, and three separate Node/Kestrel/Bruno environment quirks in the
+  `bruno-e2e` job).
 
 ## What's proven vs. still assumed
 
@@ -128,9 +136,10 @@ works (both secrets), `dotnet test` passes 11/11, and the full Bruno E2E
 suite passes 7/7 requests / 12/12 tests — including the complete JWT
 auth flow from token minting through every protected endpoint.
 
-Still open: the CI pipeline has never executed against a real GitHub
-Actions runner, the payment-status Bruno test still returns 404 because
-it hardcodes a doc number that doesn't match the simulator's randomly
-generated ones (a test-data gap, not a bug), there's no RBAC/scope
-enforcement beyond "valid token = full access," and the Node.js port
-doesn't exist yet.
+Still open: the `bruno-e2e` job's actual Bruno collection run (assertions,
+not just the surrounding tooling) hasn't been confirmed passing on a
+fresh CI push yet — every environment/networking/invocation issue in its
+path is fixed (see the README), but that's a distinct thing from the
+requests and their assertions all coming back green. There's also still
+no RBAC/scope enforcement beyond "valid token = full access," and the
+Node.js port doesn't exist yet.
