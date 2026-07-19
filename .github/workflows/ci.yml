@@ -150,6 +150,8 @@ jobs:
             http://localhost:8200/v1/secret/data/sap-adapter/dev/rfc-credentials
       - name: Start API
         working-directory: src/SapPaymentsAdapter.Api
+        env:
+          ASPNETCORE_ENVIRONMENT: Development
         run: |
           dotnet run --urls http://localhost:5000 &
           npx wait-on http://localhost:5000/swagger/v1/swagger.json --timeout 60000
