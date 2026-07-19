@@ -91,6 +91,10 @@ translation in both directions.
   serialization/status codes — this is the layer that caught the
   200-vs-202 status code bug, which mocked unit/integration tests never
   would have, since the controller layer itself wasn't exercised by them.
+  It also caught a JWT-ordering bug: the CLI's default folder discovery
+  order isn't alphabetical the way you'd assume, so the `Auth` folder ran
+  *last* and every protected request failed with 401 before a token
+  existed — fixed with explicit `folder.bru` sequencing (`Auth` → seq 1).
 
 That layering — logic, wiring, then the real thing — is the answer if
 asked "why three kinds of tests?" in an interview.
@@ -98,8 +102,18 @@ asked "why three kinds of tests?" in an interview.
 ## Infrastructure pieces and why each exists
 
 - **Vault** — replaces hardcoded/appsettings secrets. `VaultService`
-  fetches SAP RFC credentials at startup; `docker-compose.yml` runs a
-  throwaway dev instance locally.
+  fetches SAP RFC credentials *and* the JWT signing key at startup;
+  `docker-compose.yml` runs a throwaway dev instance locally and seeds
+  both secrets.
+- **JWT bearer authentication** — added after a review flagged the API
+  had none. `[Authorize]` on `SapAdapterController` requires a valid
+  token on all 5 operations; `Program.cs` validates issuer, audience,
+  lifetime, and signature. The signing key is symmetric (HMAC) and pulled
+  from Vault — explicitly a hands-on-practice simplification, not the
+  production pattern (real deployment: validate against an IDP's public
+  keys via RS256 + JWKS, not a shared secret). `POST /dev/token` mints
+  test tokens, gated to `Development` environment only, since it must
+  never exist in a real deployment.
 - **GitHub Actions CI** — `spec-lint` (catches bad OpenAPI before it
   becomes bad code) → `codegen-diff-check` (catches someone forgetting
   to regenerate) → `build-and-test` → `sonarqube` (quality gate) +
@@ -110,9 +124,13 @@ asked "why three kinds of tests?" in an interview.
 ## What's proven vs. still assumed
 
 Proven, on a real machine: build succeeds, app runs, Vault integration
-works, Bruno E2E mostly passes.
+works (both secrets), `dotnet test` passes 11/11, and the full Bruno E2E
+suite passes 7/7 requests / 12/12 tests — including the complete JWT
+auth flow from token minting through every protected endpoint.
 
-Still open: `dotnet test` hasn't actually been run (only compiled), the
-CI pipeline has never executed against a real GitHub Actions runner, the
-payment-status Bruno test needs to chain off a real doc number instead of
-a hardcoded guess, and the Node.js port doesn't exist yet.
+Still open: the CI pipeline has never executed against a real GitHub
+Actions runner, the payment-status Bruno test still returns 404 because
+it hardcodes a doc number that doesn't match the simulator's randomly
+generated ones (a test-data gap, not a bug), there's no RBAC/scope
+enforcement beyond "valid token = full access," and the Node.js port
+doesn't exist yet.
