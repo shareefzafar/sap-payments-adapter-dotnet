@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Http.Json;
-using Microsoft.AspNetCore.Mvc.Testing;
 using SapPaymentsAdapter.Api.Generated;
 using Xunit;
 
@@ -15,13 +14,13 @@ namespace SapPaymentsAdapter.IntegrationTests;
 /// in try/catch and logs a warning rather than failing startup, which is
 /// intentional so integration tests don't require a live Vault dev server.
 /// </summary>
-public class PaymentsApiIntegrationTests : IClassFixture<WebApplicationFactory<Program>>
+public class PaymentsApiIntegrationTests : IClassFixture<AuthenticatedApiFactory>
 {
     private readonly HttpClient _client;
 
-    public PaymentsApiIntegrationTests(WebApplicationFactory<Program> factory)
+    public PaymentsApiIntegrationTests(AuthenticatedApiFactory factory)
     {
-        _client = factory.CreateClient();
+        _client = factory.CreateAuthenticatedClient();
     }
 
     [Fact]
