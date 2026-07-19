@@ -7,6 +7,7 @@ rules:
     description: Every non-2xx response must reference the shared ProblemDetails schema
     given: "$.paths[*][*].responses[?(@property >= '400')]"
     severity: error
+    resolved: false
     then:
       field: content.application/json.schema.$ref
       function: truthy
