@@ -12,11 +12,23 @@ public interface IVendorsService
 public class VendorsService : IVendorsService
 {
     private readonly ISapConnector _sapConnector;
-    public VendorsService(ISapConnector sapConnector) => _sapConnector = sapConnector;
+    private readonly ILogger<VendorsService> _logger;
+
+    public VendorsService(ISapConnector sapConnector, ILogger<VendorsService> logger)
+    {
+        _sapConnector = sapConnector;
+        _logger = logger;
+    }
 
     public async Task<VendorDetail?> GetVendorAsync(string vendorId, CancellationToken ct)
     {
         var result = await _sapConnector.GetVendorDetailAsync(vendorId, ct);
-        return result.HasErrors || result.Data is null ? null : VendorsMapper.ToApiModel(result.Data);
+        if (result.HasErrors || result.Data is null)
+        {
+            _logger.LogDebug("Vendor {VendorId} not found in SAP (or lookup returned errors)", vendorId);
+            return null;
+        }
+
+        return VendorsMapper.ToApiModel(result.Data);
     }
 }
