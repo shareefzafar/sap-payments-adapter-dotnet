@@ -14,10 +14,15 @@ Request flow: the Payments module (or any downstream consumer) calls
 `SapAdapterController` → domain services (`PaymentsService`,
 `VendorsService`, `GlAccountsService`) → `ISapConnector` →
 `SapBapiSimulator` today, a real NCo-based implementation later without
-anything above the interface changing. Vault feeds RFC credentials in at
-startup; the OpenAPI spec feeds generated controller code in at build
-time (contract-first, see "Why this design" below); Bruno drives E2E
-tests against the running instance.
+anything above the interface changing. The domain services don't do
+field-by-field translation themselves — that's pulled out into
+`Mappers/` (`BapiMessageMapper`, `PaymentsMapper`, `VendorsMapper`,
+`GlAccountsMapper`), a dedicated glue layer that converts between the
+OpenAPI-generated REST DTOs and the SAP-facing shapes in
+`Services/Sap`, so each service is left doing orchestration only. Vault
+feeds RFC credentials in at startup; the OpenAPI spec feeds generated
+controller code in at build time (contract-first, see "Why this design"
+below); Bruno drives E2E tests against the running instance.
 
 New to this codebase? **[docs/CODEBASE_GUIDE.md](docs/CODEBASE_GUIDE.md)**
 walks through where to start reading, a full end-to-end request trace,

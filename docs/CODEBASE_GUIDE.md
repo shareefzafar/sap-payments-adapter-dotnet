@@ -41,12 +41,17 @@ and contract-enforced rather than a quick hack.
    real SAP behind it yet.
 
 5. **The three `Services/*/​*Service.cs` files** (Payments, Vendors,
-   GlAccounts) — the translation layer between the generated REST DTOs
-   (NSwag's choices: `double`, `DateTimeOffset`, enums) and the internal
-   SAP-shaped types in `Services/Sap` (this project's choices: `decimal`,
-   `DateOnly`). This split exists because REST contracts and SAP's
-   native shapes don't naturally agree, and pretending they do is where
-   bugs hide.
+   GlAccounts) — orchestration only: call `ISapConnector`, decide what to
+   do with the result, log where relevant. The actual translation
+   between the generated REST DTOs (NSwag's choices: `double`,
+   `DateTimeOffset`, enums) and the internal SAP-shaped types in
+   `Services/Sap` (this project's choices: `decimal`, `DateOnly`) lives
+   in **`Mappers/`** (`BapiMessageMapper`, `PaymentsMapper`,
+   `VendorsMapper`, `GlAccountsMapper`) instead — this glue code was
+   originally inline in the services themselves, but the BAPIRET2→REST
+   mapping in particular turned out to be copy-pasted verbatim across
+   three call sites, which is exactly the kind of thing worth pulling
+   into its own layer once you notice it repeating.
 
 ## How a single request flows, end to end
 
@@ -56,15 +61,15 @@ Using `POST /api/v1/payments` as the concrete example:
    defined in the YAML, generated into C# by NSwag.
 2. `SapAdapterController.InitiatePayment` receives it, calls
    `PaymentsService.InitiatePaymentAsync`.
-3. `PaymentsService` converts the generated DTO into the internal
-   `PaymentPostingRequest` (`Sap` namespace), calls
-   `ISapConnector.PostPaymentAsync`.
+3. `PaymentsService` calls `PaymentsMapper.ToSapRequest` to convert the
+   generated DTO into the internal `PaymentPostingRequest` (`Sap`
+   namespace), then calls `ISapConnector.PostPaymentAsync`.
 4. `SapBapiSimulator` "calls" `BAPI_ACC_DOCUMENT_POST`, checks if the
    vendor exists and isn't blocked, returns a `BapiResult` with a
    `BAPIRET2`-style return table.
-5. `PaymentsService` translates that back into the generated
-   `PaymentInitiationResponse` shape, checking `HasErrors` to decide
-   POSTED vs REJECTED.
+5. `PaymentsService` hands that result to `PaymentsMapper.ToApiResponse`,
+   which translates it into the generated `PaymentInitiationResponse`
+   shape, checking `HasErrors` to decide POSTED vs REJECTED.
 6. Back in the controller, `Response.StatusCode` is set explicitly — 202
    for posted, 400 for rejected — because NSwag's generated method
    signature returns a raw DTO, not `ActionResult<T>`, so this has to be
@@ -74,8 +79,8 @@ Using `POST /api/v1/payments` as the concrete example:
    in the `ProblemDetails` shape the spec defines.
 
 Every other endpoint follows this same shape: Controller → domain
-Service → `ISapConnector` → simulator, with the service doing the DTO
-translation in both directions.
+Service → `ISapConnector` → simulator, with a `Mappers/*` class doing the
+DTO translation in both directions rather than the service itself.
 
 ## The three layers of testing, and what each one proves
 
