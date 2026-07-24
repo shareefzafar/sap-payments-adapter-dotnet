@@ -101,11 +101,21 @@ jobs:
       pull-requests: write
       issues: write
       id-token: write
+    # Map the secret to a job-level env so steps can gate on it. GitHub does
+    # not allow secrets.* directly in an `if:`, so this is the supported way
+    # to make the review opt-in: no key configured -> the review step is
+    # skipped (job stays green) rather than failing the whole pipeline.
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - name: Skip review (no ANTHROPIC_API_KEY configured)
+        if: env.ANTHROPIC_API_KEY == ''
+        run: echo "::notice::ANTHROPIC_API_KEY secret is not set — skipping the agentic PR review. Add it under repo Settings → Secrets and variables → Actions to enable this job."
       - name: Claude Code review
+        if: env.ANTHROPIC_API_KEY != ''
         uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
