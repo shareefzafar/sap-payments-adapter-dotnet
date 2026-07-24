@@ -138,10 +138,17 @@ jobs:
             `confirmed: true`) to flag specific lines. Only post GitHub
             comments — do not return the review as a chat message, or it
             will be discarded with the runner.
-          # Without these tool grants Claude can run the review but has no way
-          # to publish it — the findings go to stdout and vanish. See
-          # https://github.com/anthropics/claude-code-action/blob/main/docs/solutions.md
+          # --model: Sonnet 5 rather than the default Opus 4.8. Near-Opus
+          # quality on coding/agentic work at roughly 40% of the token cost
+          # ($2/$10 per Mtok introductory vs $5/$25), which suits a per-PR
+          # first-pass reviewer. Drop to claude-haiku-4-5 ($1/$5) if cost
+          # matters more than review depth.
+          #
+          # --allowedTools: without these grants Claude can run the review but
+          # has no way to publish it — the findings go to stdout and vanish.
+          # See https://github.com/anthropics/claude-code-action/blob/main/docs/solutions.md
           claude_args: |
+            --model claude-sonnet-5
             --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
       # This is a first-pass automated reviewer, not a merge gate — keep a
       # human as the required final approver on branch protection rules,
